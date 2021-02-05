@@ -1269,14 +1269,6 @@ def stdapi_fs_chdir(request, response):
     return ERROR_SUCCESS, response
 
 @register_function
-def stdapi_fs_delete(request, response):
-    file_path = unicode(packet_get_tlv(request, TLV_TYPE_FILE_NAME)['value'])
-    if has_windll:
-        subprocess.call(unicode("attrib.exe -r ") + file_path)
-    os.unlink(file_path)
-    return ERROR_SUCCESS, response
-
-@register_function
 def stdapi_fs_delete_dir(request, response):
     dir_path = packet_get_tlv(request, TLV_TYPE_DIRECTORY_PATH)['value']
     dir_path = unicode(dir_path)
@@ -1391,14 +1383,14 @@ def stdapi_fs_search(request, response):
     if recurse:
         for root, dirs, files in os.walk(search_root):
             for f in filter(lambda f: fnmatch.fnmatch(f, glob), files):
-                file_tlv  = ''
+                file_tlv  = bytes()
                 file_tlv += tlv_pack(TLV_TYPE_FILE_PATH, root)
                 file_tlv += tlv_pack(TLV_TYPE_FILE_NAME, f)
                 file_tlv += tlv_pack(TLV_TYPE_FILE_SIZE, os.stat(os.path.join(root, f)).st_size)
                 response += tlv_pack(TLV_TYPE_SEARCH_RESULTS, file_tlv)
     else:
         for f in filter(lambda f: fnmatch.fnmatch(f, glob), os.listdir(search_root)):
-            file_tlv  = ''
+            file_tlv  = bytes()
             file_tlv += tlv_pack(TLV_TYPE_FILE_PATH, search_root)
             file_tlv += tlv_pack(TLV_TYPE_FILE_NAME, f)
             file_tlv += tlv_pack(TLV_TYPE_FILE_SIZE, os.stat(os.path.join(search_root, f)).st_size)

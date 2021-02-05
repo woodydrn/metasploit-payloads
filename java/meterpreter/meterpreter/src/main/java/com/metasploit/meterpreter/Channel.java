@@ -4,6 +4,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 
+import com.metasploit.meterpreter.command.CommandId;
+
 /**
  * A meterpreter channel. Channels are basically a collection of streams to interact with. Specialized subclasses of this class may handle special channels.
  *
@@ -30,16 +32,21 @@ public class Channel {
         this.id = meterpreter.registerChannel(this);
         this.in = in;
         this.out = out;
-        new InteractThread(in).start();
+        if (in != null) {
+            new InteractThread(in, true).start();
+        }
     }
 
     /**
      * Close this channel and deregister it from the meterpreter.
      */
     public synchronized void close() throws IOException {
-        in.close();
-        if (out != null)
+        if (in != null) {
+            in.close();
+        }
+        if (out != null) {
             out.close();
+        }
         meterpreter.channelClosed(id);
         active = false;
         closed = true;
@@ -138,16 +145,16 @@ public class Channel {
         if ((toRead == null || toRead.length > 0) && !closed) {
             TLVPacket tlv = new TLVPacket();
             tlv.add(TLVType.TLV_TYPE_CHANNEL_ID, getID());
-            String method;
+            int commandId;
             if (toRead == null) {
-                method = "core_channel_close";
+                commandId = CommandId.CORE_CHANNEL_CLOSE;
                 close();
             } else {
-                method = "core_channel_write";
+                commandId = CommandId.CORE_CHANNEL_WRITE;
                 tlv.add(TLVType.TLV_TYPE_CHANNEL_DATA, toRead);
                 tlv.add(TLVType.TLV_TYPE_LENGTH, toRead.length);
             }
-            meterpreter.writeRequestPacket(method, tlv);
+            meterpreter.writeRequestPacket(commandId, tlv);
         }
         waiting = false;
         notifyAll();
@@ -158,9 +165,11 @@ public class Channel {
      */
     protected class InteractThread extends Thread {
         private final InputStream stream;
+        private final boolean handleClose;
 
-        public InteractThread(InputStream stream) {
+        public InteractThread(InputStream stream, boolean handleClose) {
             this.stream = stream;
+            this.handleClose = handleClose;
         }
 
         public void run() {
@@ -174,7 +183,9 @@ public class Channel {
                     System.arraycopy(buffer, 0, data, 0, len);
                     handleInteract(data);
                 }
-                handleInteract(null);
+                if (handleClose) {
+                    handleInteract(null);
+                }
             } catch (Throwable t) {
                 t.printStackTrace(meterpreter.getErrorStream());
             }
